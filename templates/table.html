@@ -1,12 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Property Estimates Table</title>
+    <title>Property Estimates</title>
 </head>
 <body>
     <h1>Property Estimates</h1>
-    {{ table | safe }}
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Property Address</th>
+                <th>Zillow Estimate</th>
+                <th>Redfin Estimate</th>
+                <th>Realtor Estimate</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in data %}
+            <tr>
+                <td>{{ item.address }}</td>
+                <td>{{ item.Zillow.price if 'price' in item.Zillow else item.Zillow.error }}</td>
+                <td>{{ item.Redfin.price if 'price' in item.Redfin else item.Redfin.error }}</td>
+                <td>{{ item.Realtor.price if 'price' in item.Realtor else item.Realtor.error }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>
