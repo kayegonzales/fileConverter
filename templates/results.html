@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Property Estimates</title>
+</head>
+<body>
+    <h1>Property Estimates</h1>
+    <ul>
+        {% for item in data %}
+            <li>
+                <strong>Property:</strong> {{ item.property.address }}<br>
+                <ul>
+                    {% for estimate in item.estimates %}
+                        <li>
+                            <strong>{{ estimate.service }}:</strong><br>
+                            {% if 'data' in estimate %}
+                                Price: {{ estimate.data.price }}<br>
+                                Details: {{ estimate.data | safe }}
+                            {% else %}
+                                Error: {{ estimate.error }}
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html> 

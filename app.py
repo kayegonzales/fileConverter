@@ -1,126 +1,115 @@
-from flask import Flask, request, jsonify
-import pandas as pd
+from flask import Flask, request, jsonify, render_template
+import os
 import requests
-import io
-import PyPDF2
-import mimetypes
-from PyPDF2 import PdfReader  # Updated for PdfReader
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
+UPLOAD_FOLDER = './uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-@app.route('/read-file', methods=['POST'])
-def read_file():
+# Define API endpoints and their specific payload structures and response parsers
+APIS = {
+    "Zillow": {
+        "url": "https://api.zillow.com/property",
+        "payload": lambda property_info: {
+            "address": property_info["address"],
+            "zip": property_info.get("zip", "")
+        },
+        "parser": lambda response: {
+            "price": response.get("estimated_price", "N/A"),
+            "status": response.get("status", "Unknown")
+        }
+    },
+    "Movoto": {
+        "url": "https://api.movoto.com/property",
+        "payload": lambda property_info: {
+            "location": property_info["address"],
+            "state": property_info.get("state", "")
+        },
+        "parser": lambda response: {
+            "price": response.get("price_estimate", "N/A"),
+            "availability": response.get("listing_status", "Unknown")
+        }
+    },
+    "Redfin": {
+        "url": "https://api.redfin.com/property",
+        "payload": lambda property_info: {
+            "query": property_info["address"],
+            "city": property_info.get("city", "")
+        },
+        "parser": lambda response: {
+            "price": response.get("value", "N/A"),
+            "for_sale": response.get("for_sale", False)
+        }
+    }
+}
+
+# Function to extract text from uploaded file
+def extract_text(file_path):
+    # Add file type handling (e.g., PDF, DOCX) here
+    with open(file_path, 'r') as file:
+        return file.read()
+
+# Function to make API call with specific payload and parse the response
+def fetch_property_data(service, config, property_info):
     try:
-        # Get the links from the request
-        urls = request.json.get('urls')
-
-        if not urls or len(urls) < 1:
-            return jsonify({'error': 'No URLs provided'}), 400
-
-        response = None
-
-        # Try each URL until one works
-        for url in urls:
-            try:
-                # Convert Google Drive links to direct download links if applicable
-                if 'drive.google.com/file/d/' in url:
-                    file_id = url.split('/d/')[1].split('/')[0]
-                    url = f'https://drive.google.com/uc?export=download&id={file_id}'
-                elif 'drive.google.com/open?id=' in url:
-                    file_id = url.split('id=')[1]
-                    url = f'https://drive.google.com/uc?export=download&id={file_id}'
-
-                # Download the file
-                response = requests.get(url)
-                response.raise_for_status()  # Ensure we got a successful response
-                break  # If successful, break out of the loop
-            except requests.exceptions.RequestException as e:
-                # Log the error and continue to the next URL
-                print(f"Failed to download from {url}: {str(e)}")
-                continue
-
-        if response is None:
-            return jsonify({'error': 'All provided URLs failed to download'}), 400
-
-        # Get the content type from the response headers
-        content_type = response.headers.get('Content-Type')
-        extension = mimetypes.guess_extension(content_type)
-
-        detected_content_type = content_type  # Use content type from response headers if available
-
-        # Process the file based on the content type or extension
-        if detected_content_type == 'text/csv' or extension == '.csv':
-            # If the URL points to a CSV file
-            file = io.StringIO(response.text)
-            df = pd.read_csv(file)
-
-        elif detected_content_type in ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'] or extension in ['.xlsx', '.xls']:
-            # If the URL points to an Excel file
-            file = io.BytesIO(response.content)
-            df = pd.read_excel(file, engine='openpyxl')
-
-        elif detected_content_type == 'application/json' or extension == '.json':
-            # If the URL points to a JSON file
-            df = pd.read_json(io.StringIO(response.text))
-
-        elif detected_content_type == 'text/plain' or extension == '.txt':
-            # If the URL points to a TXT file
-            file = io.StringIO(response.text)
-            df = pd.read_table(file, delimiter=',')  # Adjust delimiter as needed
-
-        elif 'docs.google.com/spreadsheets' in url:
-            # Handle Google Sheets URL
-            file_id = url.split('/d/')[1].split('/')[0]
-            csv_url = f'https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv'
-            response = requests.get(csv_url)
-            response.raise_for_status()  # Ensure we got a successful response
-            csv_file = io.StringIO(response.text)
-            df = pd.read_csv(csv_file)
-
-        elif detected_content_type == 'application/pdf' or extension == '.pdf':
-            # If the URL points to a PDF file
-            file = io.BytesIO(response.content)
-            pdf_reader = PdfReader(file)
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
-            # Return the extracted text from PDF
-            return jsonify({'pdf_text': text})
-
-        elif detected_content_type == 'application/octet-stream' or extension == '.bin':
-            # Handle ambiguous file types or binary files
-            # Attempt different file types (Excel, PDF)
-            try:
-                # Try to read it as an Excel file
-                file = io.BytesIO(response.content)
-                df = pd.read_excel(file, engine='openpyxl')
-            except Exception as e:
-                print(f"Failed to read as Excel: {str(e)}")
-                try:
-                    # Try to read it as a PDF file
-                    file.seek(0)
-                    pdf_reader = PdfReader(file)
-                    text = ""
-                    for page in pdf_reader.pages:
-                        text += page.extract_text() + "\n"
-                    # Return the extracted text from PDF
-                    return jsonify({'pdf_text': text})
-                except Exception as e:
-                    print(f"Failed to read as PDF: {str(e)}")
-                    # Fallback to returning raw data
-                    return jsonify({'error': 'Unsupported or unknown file type', 'content_type': content_type, 'details': 'Could not parse the file content'}), 400
-
-        else:
-            return jsonify({'error': 'Unsupported file type', 'content_type': content_type, 'extension': extension, 'detected_content_type': detected_content_type}), 400
-
-        return jsonify(df.to_dict())
-    
-    except requests.exceptions.RequestException as e:
-        # Handle request errors (e.g., bad response)
-        return jsonify({'error': 'Request failed', 'details': str(e)}), 500
+        payload = config["payload"](property_info)
+        response = requests.post(config["url"], json=payload, timeout=10)
+        response.raise_for_status()
+        parsed_data = config["parser"](response.json())
+        return {"service": service, "data": parsed_data}
     except Exception as e:
-        # Handle other errors (e.g., parsing errors)
-        return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
+        return {"service": service, "error": str(e)}
+
+@app.route('/', methods=['GET', 'POST'])
+def upload_file():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(file_path)
+        
+        # Extract text from the file
+        text_data = extract_text(file_path)
+        # Convert text into structured property data (mockup example)
+        properties = [{"address": line} for line in text_data.splitlines() if line.strip()]
+
+        # Fetch property data in parallel
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(
+                lambda property_info: {
+                    "property": property_info,
+                    "estimates": [
+                        fetch_property_data(service, config, property_info)
+                        for service, config in APIS.items()
+                    ]
+                },
+                properties
+            ))
+
+        # Consolidate and prepare the response
+        consolidated_data = [
+            {
+                "property": result["property"],
+                "estimates": result["estimates"]
+            }
+            for result in results
+        ]
+
+        return render_template('results.html', data=consolidated_data)
+
+    return render_template('upload.html')
+
+@app.route('/results', methods=['POST'])
+def display_results():
+    data = request.json
+    return jsonify({"results": data})
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
