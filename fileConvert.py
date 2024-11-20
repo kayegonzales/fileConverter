@@ -77,6 +77,32 @@ def extract_data(file_path, file_type):
     else:
         return {'error': 'Unsupported file type'}
 
+def split_text_for_make(text, max_chunk_size=3000):
+    """
+    Splits the text into manageable chunks for Make.com.
+    Args:
+        text (str): The raw extracted text.
+        max_chunk_size (int): The maximum size of each chunk in characters.
+    Returns:
+        list: A list of text chunks.
+    """
+    words = text.split()
+    chunks = []
+    current_chunk = []
+
+    for word in words:
+        if len(' '.join(current_chunk) + ' ' + word) <= max_chunk_size:
+            current_chunk.append(word)
+        else:
+            chunks.append(' '.join(current_chunk))
+            current_chunk = [word]
+
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
+
+    return chunks
+
+
 # Route for uploading and processing the file
 @app.route('/')
 def index():
@@ -107,7 +133,7 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
-    # Save the file to a folder and process
+    # Save the file and process
     if file:
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(file_path)
@@ -116,29 +142,29 @@ def upload_file():
         file_type = file.filename.rsplit('.', 1)[1].lower()
         raw_data = extract_data(file_path, file_type)
 
-        # Log the JSON data
-        logger.info(f"JSON data extracted: {raw_data}")
+        if isinstance(raw_data, str):
+            # Split the text into chunks
+            chunks = split_text_for_make(raw_data, max_chunk_size=3000)
 
-        # Send data to webhook
-        webhook_url = "https://hook.us1.make.com/huolkx7l5lpug0q51wxftsvfctnkcday"
-        payload = {'data': raw_data}
-        headers = {
-            'Content-Type': 'application/json'
-        }
-        try:
-            response = requests.post(webhook_url, json=payload, headers=headers)
-            response.raise_for_status()
-            logger.info(f"Data successfully sent to webhook: {response.status_code}")
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to send data to webhook: {e}")
-            return jsonify({'error': 'Failed to send data to webhook'}), 400
+            # Prepare the payload for Make.com
+            payload = {
+                'chunks': chunks  # Send the array of chunks
+            }
 
-        # Store the data in global variable for displaying in table later
-        global combined_data_global
-        combined_data_global = []  # Reset to ensure we start fresh
+            # Send the chunks array to Make.com
+            webhook_url = "https://hook.us1.make.com/your-webhook-url"
+            headers = {'Content-Type': 'application/json'}
+            try:
+                response = requests.post(webhook_url, json=payload, headers=headers)
+                response.raise_for_status()
+                logger.info(f"Chunks successfully sent to Make.com: {response.status_code}")
+                return jsonify({'status': 'success', 'message': 'Chunks sent to Make.com'}), 200
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Failed to send data to Make.com: {e}")
+                return jsonify({'error': 'Failed to send data to Make.com', 'details': str(e)}), 500
+        else:
+            return jsonify({'error': 'Unsupported data format for processing'}), 400
 
-        # Redirect to the /loading route
-        return redirect(url_for('loading'))
 
 @app.route('/loading')
 def loading():
