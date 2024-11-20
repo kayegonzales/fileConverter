@@ -27,6 +27,25 @@ combined_data_global = []
 # Define path to Tesseract executable
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
+# Route for the homepage
+@app.route('/')
+def index():
+    return '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>File Converter API</title>
+    </head>
+    <body>
+        <h1>Welcome to the File Converter API</h1>
+        <p>This API allows you to upload and process files in various formats.</p>
+        <p>Use the <code>/upload</code> endpoint to upload a file for processing.</p>
+    </body>
+    </html>
+    '''
+
 # Function to process and extract data from different file types
 def extract_data(file_path, file_type):
     try:
@@ -166,7 +185,6 @@ def display_data():
 
 if __name__ == '__main__':
     import os
-    port = int(os.environ.get('PORT', 5000))  # Get the PORT from the environment
-    logger.info(f"Starting server on port {port}")  # Log the port number
+    port = int(os.environ.get('PORT', 5000))  # Get the PORT from Heroku's environment
+    logger.info(f"Starting server on port {port}")
     app.run(debug=False, host='0.0.0.0', port=port)
-
