@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @app.route('/')
 def index():
-    return render_template('index.html')  # Ensure index.html is in templates/
+    return render_template('index.html')  # Ensure index.html is in the templates/ folder
 
 def extract_data(file_path, file_type):
     try:
@@ -36,7 +36,9 @@ def extract_data(file_path, file_type):
             logger.info(f"Sample Data:\n{df.head()}")
 
             # Combine all columns into a single "Address" field
-            df['Address'] = df.apply(lambda row: ', '.join(row.dropna().astype(str).values), axis=1)
+            df['Address'] = df.apply(
+                lambda row: ', '.join(row.dropna().astype(str).str.strip()), axis=1
+            )
 
             logger.info(f"Combined Address Data:\n{df['Address'].head()}")
 
@@ -107,6 +109,27 @@ def upload_file():
         except Exception as e:
             logger.error(f"Error processing file: {e}")
             return jsonify({'error': f'Failed to process file: {str(e)}'}), 500
+
+@app.route('/webhook', methods=['POST', 'GET'])
+def display_data():
+    global combined_data_global
+    try:
+        if request.method == 'POST':
+            incoming_data = request.get_json()
+            if not incoming_data:
+                return jsonify({'error': 'No data received'}), 400
+
+            combined_data_global = incoming_data.get('aggregated_properties', [])
+            return jsonify({'status': 'success', 'message': 'Data received and stored'}), 200
+
+        elif request.method == 'GET':
+            if not combined_data_global:
+                return jsonify({'error': 'No data available'}), 400
+            return jsonify({'data': combined_data_global}), 200
+
+    except Exception as e:
+        logger.error(f"Error handling webhook data: {e}")
+        return jsonify({'error': 'Failed to handle data', 'details': str(e)}), 500
 
 if __name__ == '__main__':
     import os
