@@ -11,8 +11,6 @@ from charset_normalizer import from_bytes
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
-TEMPLATE_FOLDER = 'templates'  # Default Flask folder for templates
-
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -30,7 +28,7 @@ pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 # Route for the homepage, rendering index.html
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html')  # Ensure `index.html` is in the templates folder
 
 # Function to process and extract data from different file types
 def extract_data(file_path, file_type):
@@ -41,8 +39,13 @@ def extract_data(file_path, file_type):
                 result = from_bytes(raw_file.read()).best()
                 encoding = result.encoding
             df = pd.read_csv(file_path, encoding=encoding)
+
+            # Ensure the "Address" field exists or combine columns into one if needed
+            if 'Address' not in df.columns:
+                df['Address'] = df.apply(lambda row: ', '.join(row.dropna().astype(str)), axis=1)
+
             df = df.replace({np.nan: None})  # Replace NaN with None for JSON serialization
-            return df.to_dict(orient='records')
+            return df[['Address']].to_dict(orient='records')  # Return only the "Address" field
 
         elif file_type == 'xlsx':
             # Process Excel files
@@ -136,7 +139,7 @@ def upload_file():
                 raise ValueError("Unsupported data format")
 
             # Send payload to Make.com
-            webhook_url = "https://hook.us1.make.com/huolkx7l5lpug0q51wxftsvfctnkcday"
+            webhook_url = "https://hook.us1.make.com/your-webhook-url"
             headers = {'Content-Type': 'application/json'}
             response = requests.post(webhook_url, json=payload, headers=headers)
             response.raise_for_status()
