@@ -139,7 +139,7 @@ def upload_file():
                 raise ValueError("Unsupported data format")
 
             # Send payload to Make.com
-            webhook_url = "https://hook.us1.make.com/your-webhook-url"
+            webhook_url = "https://hook.us1.make.com/huolkx7l5lpug0q51wxftsvfctnkcday"
             headers = {'Content-Type': 'application/json'}
             response = requests.post(webhook_url, json=payload, headers=headers)
             response.raise_for_status()
