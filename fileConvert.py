@@ -9,7 +9,7 @@ import logging
 import io
 import re
 import requests
-import chardet
+from charset_normalizer import from_bytes
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -31,10 +31,10 @@ pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 def extract_data(file_path, file_type):
     try:
         if file_type == 'csv':
-            # Detect encoding for robust CSV handling
+            # Detect encoding for robust CSV handling using charset-normalizer
             with open(file_path, 'rb') as raw_file:
-                result = chardet.detect(raw_file.read())
-                encoding = result['encoding']
+                result = from_bytes(raw_file.read()).best()
+                encoding = result.encoding
             df = pd.read_csv(file_path, encoding=encoding)
             df = df.replace({np.nan: None})  # Replace NaN with None for JSON serialization
             return df.to_dict(orient='records')
