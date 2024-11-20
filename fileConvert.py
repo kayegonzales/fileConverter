@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 import os
 import pandas as pd
 from PIL import Image
@@ -6,13 +6,13 @@ import pytesseract
 import PyPDF2
 import numpy as np
 import logging
-import io
-import re
 import requests
 from charset_normalizer import from_bytes
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
+TEMPLATE_FOLDER = 'templates'  # Default Flask folder for templates
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -27,24 +27,10 @@ combined_data_global = []
 # Define path to Tesseract executable
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-# Route for the homepage
+# Route for the homepage, rendering index.html
 @app.route('/')
 def index():
-    return '''
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>File Converter API</title>
-    </head>
-    <body>
-        <h1>Welcome to the File Converter API</h1>
-        <p>This API allows you to upload and process files in various formats.</p>
-        <p>Use the <code>/upload</code> endpoint to upload a file for processing.</p>
-    </body>
-    </html>
-    '''
+    return render_template('index.html')
 
 # Function to process and extract data from different file types
 def extract_data(file_path, file_type):
