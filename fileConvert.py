@@ -152,7 +152,7 @@ def upload_file():
             }
 
             # Send the chunks array to Make.com
-            webhook_url = "https://hook.us1.make.com/your-webhook-url"
+            webhook_url = "https://hook.us1.make.com/huolkx7l5lpug0q51wxftsvfctnkcday"
             headers = {'Content-Type': 'application/json'}
             try:
                 response = requests.post(webhook_url, json=payload, headers=headers)
