@@ -31,16 +31,20 @@ def extract_data(file_path, file_type):
                 encoding = result.encoding
             df = pd.read_csv(file_path, encoding=encoding)
 
-            # Debugging: Print columns and a sample of the data
+            # Debugging: Log the structure of the CSV file
             logger.info(f"CSV Columns: {df.columns.tolist()}")
             logger.info(f"Sample Data:\n{df.head()}")
 
-            # Combine all columns into a single "Address" field
-            df['Address'] = df.apply(
-                lambda row: ', '.join(row.dropna().astype(str).str.strip()), axis=1
-            )
+            # If there's only one column, assume it contains the full address
+            if len(df.columns) == 1:
+                df.rename(columns={df.columns[0]: "Address"}, inplace=True)  # Ensure column is named "Address"
+            else:
+                # Combine all columns into a single "Address" field for multi-column CSVs
+                df['Address'] = df.apply(
+                    lambda row: ', '.join(row.dropna().astype(str).str.strip()), axis=1
+                )
 
-            logger.info(f"Combined Address Data:\n{df['Address'].head()}")
+            logger.info(f"Processed Address Data:\n{df['Address'].head()}")
 
             df = df.replace({np.nan: None})  # Replace NaN with None for JSON serialization
             return df[['Address']].to_dict(orient='records')  # Return only the "Address" field
@@ -73,6 +77,7 @@ def extract_data(file_path, file_type):
     except Exception as e:
         logger.error(f"Error processing file of type {file_type}: {e}")
         raise
+
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
