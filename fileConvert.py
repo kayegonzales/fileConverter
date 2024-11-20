@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template
 import os
 import pandas as pd
 from PIL import Image
@@ -18,19 +18,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global variable to store processed data temporarily
-global combined_data_global
-combined_data_global = []
-
-# Define path to Tesseract executable
-pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-
-# Route for the homepage, rendering index.html
 @app.route('/')
 def index():
-    return render_template('index.html')  # Ensure `index.html` is in the templates folder
+    return render_template('index.html')  # Ensure index.html is in templates/
 
-# Function to process and extract data from different file types
 def extract_data(file_path, file_type):
     try:
         if file_type == 'csv':
@@ -40,8 +31,14 @@ def extract_data(file_path, file_type):
                 encoding = result.encoding
             df = pd.read_csv(file_path, encoding=encoding)
 
+            # Debugging: Print columns and a sample of the data
+            logger.info(f"CSV Columns: {df.columns.tolist()}")
+            logger.info(f"Sample Data:\n{df.head()}")
+
             # Combine all columns into a single "Address" field
-            df['Address'] = df.apply(lambda row: ', '.join(row.astype(str).values), axis=1)
+            df['Address'] = df.apply(lambda row: ', '.join(row.dropna().astype(str).values), axis=1)
+
+            logger.info(f"Combined Address Data:\n{df['Address'].head()}")
 
             df = df.replace({np.nan: None})  # Replace NaN with None for JSON serialization
             return df[['Address']].to_dict(orient='records')  # Return only the "Address" field
@@ -98,7 +95,7 @@ def upload_file():
             else:
                 raise ValueError("Unsupported data format")
 
-            logger.info(f"Payload to webhook: {payload}")  # Debug log
+            logger.info(f"Payload to webhook: {payload}")
 
             webhook_url = "https://hook.us1.make.com/huolkx7l5lpug0q51wxftsvfctnkcday"
             headers = {'Content-Type': 'application/json'}
