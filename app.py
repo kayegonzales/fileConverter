@@ -123,4 +123,6 @@ def read_file():
         return jsonify({'error': 'An error occurred', 'details': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run()
+    import os
+    port = int(os.environ.get('PORT', 5000))  # Use the PORT variable from the environment
+    app.run(host='0.0.0.0', port=port,debug=False)  # Bind to all network interfaces and use the assigned port

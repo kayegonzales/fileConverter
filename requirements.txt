@@ -7,3 +7,4 @@ requests==2.31.0  # For HTTP requests to Make.com
 openpyxl==3.1.2  # For Excel file handling
 numpy==1.23.5  # For handling missing data in pandas
 charset-normalizer==3.3.0  # For character encoding detection
+gunicorn==20.1.0  # Production WSGI server
